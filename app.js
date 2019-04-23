@@ -12,8 +12,10 @@ app.get( '/', function( req, res ) {
 } );
 
 app.post( '/', function( req, res ) {
-  console.log("Logging request body");
-  console.log(req.body);
+  if( process.env["LOG_REQUESTS"] ) {
+    console.log("Logging request body");
+    console.log(req.body);
+  }
 
   const changeSets = req.body.changeSets;
 
@@ -40,11 +42,13 @@ app.post( '/', function( req, res ) {
 function informWatchers( changedTriples, res ){
   for( let entry of services ) {
     // for each entity
-    console.log(`Checking if we want to send to ${entry.callback.uri}`);
+    if( process.env["DEBUG_DELTA_MATCH"] )
+      console.log(`Checking if we want to send to ${entry.callback.uri}`);
     let matchSpec = entry.match;
     if( changedTriples.find( (triple) => tripleMatchesSpec( triple, matchSpec ) ) ) {
       // inform matching entities
-      console.log(`Sending ${entry.callback.method} to ${entry.callback.uri}`);
+      if( process.env["DEBUG_DELTA_SEND"] )
+        console.log(`Sending ${entry.callback.method} to ${entry.callback.uri}`);
       request({
         uri: entry.callback.uri,
         method: entry.callback.method
