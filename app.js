@@ -1,6 +1,6 @@
 import { app } from 'mu';
 import request from 'request';
-import services from './config/config.js';
+import services from '/config/rules.js';
 import bodyParser from 'body-parser';
 
 // Also parse application/json as json
