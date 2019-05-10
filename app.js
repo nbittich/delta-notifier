@@ -6,6 +6,10 @@ import bodyParser from 'body-parser';
 // Also parse application/json as json
 app.use( bodyParser.json( { type: function(req) { return /^application\/json/.test( req.get('content-type') ); } } ) );
 
+// Log server config if requested
+if( process.env["LOG_SERVER_CONFIGURATION"] )
+  console.log(JSON.stringify( services ));
+
 app.get( '/', function( req, res ) {
   res.status(200);
   res.send("Hello, delta notification is running");
@@ -49,6 +53,8 @@ function informWatchers( changeSets, changedTriples, res ){
 
     let someTripleMatchedSpec = changedTriples.some( (triple) => tripleMatchesSpec( triple, matchSpec ) );
 
+    if( process.env["DEBUG_TRIPLE_MATCHES_SPEC"] )
+      console.log(`Triple matches spec? ${someTripleMatchedSpec}`);
 
     if( someTripleMatchedSpec ) {
       // inform matching entities
@@ -68,6 +74,9 @@ function informWatchers( changeSets, changedTriples, res ){
 
 function tripleMatchesSpec( triple, matchSpec ) {
   // form of triple is {s, p, o}, same as matchSpec
+  if( process.env["DEBUG_TRIPLE_MATCHES_SPEC"] )
+    console.log(`Does ${JSON.stringify(triple)} match ${JSON.stringify(matchSpec)}?`);
+
   for( let key in matchSpec ){
     // key is one of s, p, o
     let subMatchSpec = matchSpec[key];
@@ -119,6 +128,9 @@ function sendRequest( entry, changeSets ) {
     // we should only inform
     requestObject = { uri, method };
   }
+
+  if( process.env["DEBUG_DELTA_SEND"] )
+    console.log(`Executing send ${method} to ${uri}`);
 
   request( requestObject ); // execute request
 }
