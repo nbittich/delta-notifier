@@ -33,26 +33,35 @@ app.post( '/', function( req, res ) {
   } );
 
   // inform watchers
-  informWatchers( [...allInserts, ...allDeletes], res );
+  informWatchers( changeSets, [...allInserts, ...allDeletes], res );
 
   // push relevant data to interested actors
   res.status(204).send();
 } );
 
-function informWatchers( changedTriples, res ){
+function informWatchers( changeSets, changedTriples, res ){
   for( let entry of services ) {
     // for each entity
     if( process.env["DEBUG_DELTA_MATCH"] )
       console.log(`Checking if we want to send to ${entry.callback.uri}`);
+
     let matchSpec = entry.match;
-    if( changedTriples.find( (triple) => tripleMatchesSpec( triple, matchSpec ) ) ) {
+
+    let someTripleMatchedSpec = changedTriples.some( (triple) => tripleMatchesSpec( triple, matchSpec ) );
+
+
+    if( someTripleMatchedSpec ) {
       // inform matching entities
       if( process.env["DEBUG_DELTA_SEND"] )
-        console.log(`Sending ${entry.callback.method} to ${entry.callback.uri}`);
-      request({
-        uri: entry.callback.uri,
-        method: entry.callback.method
-      });
+        console.log(`Going to send ${entry.callback.method} to ${entry.callback.uri}`);
+
+      let requestSendingFunction = () => sendRequest( entry, changeSets );
+
+      if( entry.options && request.options.gracePeriod ) {
+        setTimeout( requestSendingFunction, entry.options.gracePeriod );
+      } else {
+        requestSendingFunction();
+      }
     }
   }
 }
@@ -73,4 +82,43 @@ function tripleMatchesSpec( triple, matchSpec ) {
         return false;
   }
   return true; // no false matches found, let's send a response
+}
+
+
+function formatChangesetBody( changeSets, options ) {
+  if( options.resourceFormat == "v0.0.0-genesis" ) {
+    return JSON.stringify(
+      changeSets.map( (change) => {
+        return {
+          inserts: change.insert,
+          deletes: change.delete
+        };
+      } ) );
+    // [{delta: {inserts, deletes}]
+  } else {
+    throw `Unknown resource format ${options.resourceFormat}`;
+  }
+}
+
+function sendRequest( entry, changeSets ) {
+  let requestObject; // will contain request information
+
+  // construct the requestObject
+  let method = entry.callback.method;
+  let uri = entry.callback.uri;
+  if( entry.options && entry.options.resourceFormat ) {
+    // we should send contents
+    const body = formatChangesetBody( changeSets, entry.options );
+
+    requestObject = {
+      uri, method,
+      headers: { "Content-Type": "application/json" },
+      body: body
+    };
+  } else {
+    // we should only inform
+    requestObject = { uri, method };
+  }
+
+  request( requestObject ); // execute request
 }
