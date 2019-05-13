@@ -45,16 +45,18 @@ app.post( '/', function( req, res ) {
 } );
 
 async function informWatchers( changeSets, changedTriples, res ){
-  for( let entry of services ) {
+  services.map( async (entry) => {
     // for each entity
     if( process.env["DEBUG_DELTA_MATCH"] )
       console.log(`Checking if we want to send to ${entry.callback.url}`);
 
-    let matchSpec = entry.match;
+    const matchSpec = entry.match;
 
-    let originFilteredTriples = await filterMatchesForOrigin( changedTriples, entry );
+    const originFilteredTriples = await filterMatchesForOrigin( changedTriples, entry );
+    if( process.env["DEBUG_TRIPLE_MATCHES_SPEC"] )
+      console.log(`There are ${originFilteredTriples.length} triples not from ${hostnameForEntry( entry )}`);
 
-    let someTripleMatchedSpec =
+    const someTripleMatchedSpec =
         originFilteredTriples
         .some( (triple) => tripleMatchesSpec( triple, matchSpec ) );
 
@@ -74,7 +76,7 @@ async function informWatchers( changeSets, changedTriples, res ){
         sendRequest( entry, changeSets );
       }
     }
-  }
+  } );
 }
 
 function tripleMatchesSpec( triple, matchSpec ) {
@@ -84,8 +86,8 @@ function tripleMatchesSpec( triple, matchSpec ) {
 
   for( let key in matchSpec ){
     // key is one of s, p, o
-    let subMatchSpec = matchSpec[key];
-    let subMatchValue = triple[key];
+    const subMatchSpec = matchSpec[key];
+    const subMatchValue = triple[key];
 
     if( subMatchSpec && !subMatchValue )
       return false;
@@ -118,8 +120,8 @@ function sendRequest( entry, changeSets ) {
   let requestObject; // will contain request information
 
   // construct the requestObject
-  let method = entry.callback.method;
-  let url = entry.callback.url;
+  const method = entry.callback.method;
+  const url = entry.callback.url;
   if( entry.options && entry.options.resourceFormat ) {
     // we should send contents
     const body = formatChangesetBody( changeSets, entry.options );
@@ -144,13 +146,17 @@ async function filterMatchesForOrigin( changedTriples, entry ) {
   if( ! entry.options || !entry.options.ignoreFromSelf ) {
     return changedTriples;
   } else {
-    let originIpAddress = await getServiceIp( entry.callback.url );
+    const originIpAddress = await getServiceIp( entry );
     return changedTriples.filter( (change) => change.origin != originIpAddress );
   }
 }
 
-async function getServiceIp(serviceEndpoint) {
-  const hostName = (new URL(serviceEndpoint)).hostName;
+function hostnameForEntry( entry ) {
+  return (new URL(entry.callback.url)).hostname;
+}
+
+async function getServiceIp(entry) {
+  const hostName = hostnameForEntry( entry );
   return new Promise( (resolve, reject) => {
     dns.lookup( hostName, { family: 4 }, ( err, address) => {
       if( err )
