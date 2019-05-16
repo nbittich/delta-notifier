@@ -126,9 +126,13 @@ function sendRequest( entry, changeSets ) {
     // we should send contents
     const body = formatChangesetBody( changeSets, entry.options );
 
+    // TODO: we now assume the mu-auth-allowed-groups will be the same
+    // for each changeSet.  that's a simplification and we should not
+    // depend on it.
+
     requestObject = {
       url, method,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "MU-AUTH-ALLOWED-GROUPS": changeSets[0].allowedGroups },
       body: body
     };
   } else {
