@@ -68,7 +68,7 @@ async function informWatchers( changeSets, changedTriples, res ){
       if( process.env["DEBUG_DELTA_SEND"] )
         console.log(`Going to send ${entry.callback.method} to ${entry.callback.url}`);
 
-      if( entry.options && request.options.gracePeriod ) {
+      if( entry.options && entry.options.gracePeriod ) {
         setTimeout(
           () => sendRequest( entry, changeSets ),
           entry.options.gracePeriod );
