@@ -133,7 +133,7 @@ function formatChangesetBody( changeSets, options ) {
   }
 }
 
-function sendRequest( entry, changeSets ) {
+async function sendRequest( entry, changeSets ) {
   let requestObject; // will contain request information
 
   // construct the requestObject
@@ -160,7 +160,17 @@ function sendRequest( entry, changeSets ) {
   if( process.env["DEBUG_DELTA_SEND"] )
     console.log(`Executing send ${method} to ${url}`);
 
-  request( requestObject ); // execute request
+  request( requestObject, function( error, response, body ) {
+    if( error ) {
+      console.log(`Could not send request ${method} ${url}`);
+      console.log(error);
+      console.log(`NOT RETRYING`); // TODO: retry a few times when delta's fail to send
+    }
+
+    if( response ) {
+      // console.log( body );
+    }
+  });
 }
 
 async function filterMatchesForOrigin( changedTriples, entry ) {
