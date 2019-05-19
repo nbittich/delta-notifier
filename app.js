@@ -102,7 +102,7 @@ function tripleMatchesSpec( triple, matchSpec ) {
 
 
 function formatChangesetBody( changeSets, options ) {
-  if( options.resourceFormat == "v0.0.0-genesis" ) {
+  if( options.resourceFormat == "v0.0.1" ) {
     return JSON.stringify(
       changeSets.map( (change) => {
         return {
@@ -110,7 +110,24 @@ function formatChangesetBody( changeSets, options ) {
           deletes: change.delete
         };
       } ) );
+  }
+  if( options.resourceFormat == "v0.0.0-genesis" ) {
     // [{delta: {inserts, deletes}]
+    const newOptions = Object.assign({}, options, { resourceFormat: "v0.0.1" });
+    const newFormat = JSON.parse( formatChangesetBody( changeSets, newOptions ) );
+    return JSON.stringify({
+      // graph: Not available
+      delta: {
+        inserts: newFormat
+          .flatMap( ({inserts}) => inserts)
+          .map( ({subject,predicate,object}) =>
+                ( { s: subject.value, p: predicate.value, o: object.value } ) ),
+        deletes: newFormat
+          .flatMap( ({deletes}) => deletes)
+          .map( ({subject,predicate,object}) =>
+                ( { s: subject.value, p: predicate.value, o: object.value } ) )
+      }
+    });
   } else {
     throw `Unknown resource format ${options.resourceFormat}`;
   }
