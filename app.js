@@ -1,4 +1,4 @@
-import { app } from 'mu';
+import { app, uuid } from 'mu';
 import request from 'request';
 import services from '/config/rules.js';
 import bodyParser from 'body-parser';
@@ -24,6 +24,10 @@ app.post( '/', function( req, res ) {
 
   const changeSets = req.body.changeSets;
 
+  const originalMuCallIdTrail = JSON.parse( req.get('mu-call-id-trail') || "[]" );
+  const originalMuCallId = req.get('mu-call-id');
+  const muCallIdTrail = JSON.stringify( [...originalMuCallIdTrail, originalMuCallId] );
+
   changeSets.forEach( (change) => {
     change.insert = change.insert || [];
     change.delete = change.delete || [];
@@ -38,13 +42,13 @@ app.post( '/', function( req, res ) {
   } );
 
   // inform watchers
-  informWatchers( changeSets, [...allInserts, ...allDeletes], res );
+  informWatchers( changeSets, [...allInserts, ...allDeletes], res, muCallIdTrail );
 
   // push relevant data to interested actors
   res.status(204).send();
 } );
 
-async function informWatchers( changeSets, changedTriples, res ){
+async function informWatchers( changeSets, changedTriples, res, muCallIdTrail ){
   services.map( async (entry) => {
     // for each entity
     if( process.env["DEBUG_DELTA_MATCH"] )
@@ -70,10 +74,10 @@ async function informWatchers( changeSets, changedTriples, res ){
 
       if( entry.options && entry.options.gracePeriod ) {
         setTimeout(
-          () => sendRequest( entry, changeSets ),
+          () => sendRequest( entry, changeSets, muCallIdTrail ),
           entry.options.gracePeriod );
       } else {
-        sendRequest( entry, changeSets );
+        sendRequest( entry, changeSets, muCallIdTrail );
       }
     }
   } );
@@ -133,12 +137,14 @@ function formatChangesetBody( changeSets, options ) {
   }
 }
 
-async function sendRequest( entry, changeSets ) {
+async function sendRequest( entry, changeSets, muCallIdTrail ) {
   let requestObject; // will contain request information
 
   // construct the requestObject
   const method = entry.callback.method;
   const url = entry.callback.url;
+  const headers = { "Content-Type": "application/json", "MU-AUTH-ALLOWED-GROUPS": changeSets[0].allowedGroups, "mu-call-id-trail": muCallIdTrail, "mu-call-id": uuid() };
+
   if( entry.options && entry.options.resourceFormat ) {
     // we should send contents
     const body = formatChangesetBody( changeSets, entry.options );
@@ -149,12 +155,12 @@ async function sendRequest( entry, changeSets ) {
 
     requestObject = {
       url, method,
-      headers: { "Content-Type": "application/json", "MU-AUTH-ALLOWED-GROUPS": changeSets[0].allowedGroups },
+      headers,
       body: body
     };
   } else {
     // we should only inform
-    requestObject = { url, method };
+    requestObject = { url, method, headers };
   }
 
   if( process.env["DEBUG_DELTA_SEND"] )
