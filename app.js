@@ -33,22 +33,14 @@ app.post( '/', function( req, res ) {
     change.delete = change.delete || [];
   } );
 
-  let allInserts = [];
-  let allDeletes = [];
-
-  changeSets.forEach( (change) => {
-    allInserts = [...allInserts, ...change.insert];
-    allDeletes = [...allDeletes, ...change.delete];
-  } );
-
   // inform watchers
-  informWatchers( changeSets, [...allInserts, ...allDeletes], res, muCallIdTrail );
+    informWatchers( changeSets, res, muCallIdTrail );
 
   // push relevant data to interested actors
   res.status(204).send();
 } );
 
-async function informWatchers( changeSets, changedTriples, res, muCallIdTrail ){
+async function informWatchers( changeSets, res, muCallIdTrail ){
   services.map( async (entry) => {
     // for each entity
     if( process.env["DEBUG_DELTA_MATCH"] )
@@ -56,12 +48,22 @@ async function informWatchers( changeSets, changedTriples, res, muCallIdTrail ){
 
     const matchSpec = entry.match;
 
-    const originFilteredTriples = await filterMatchesForOrigin( changedTriples, entry );
-    if( process.env["DEBUG_TRIPLE_MATCHES_SPEC"] )
-      console.log(`There are ${originFilteredTriples.length} triples not from ${hostnameForEntry( entry )}`);
+    const originFilteredChangeSets = await filterMatchesForOrigin( changeSets, entry );
+    if( process.env["DEBUG_TRIPLE_MATCHES_SPEC"] && entry.options.ignoreFromSelf )
+      console.log(`There are ${originFilteredChangeSets.length} changes sets not from ${hostnameForEntry( entry )}`);
+
+    let allInserts = [];
+    let allDeletes = [];
+
+    originFilteredChangeSets.forEach( (change) => {
+      allInserts = [...allInserts, ...change.insert];
+      allDeletes = [...allDeletes, ...change.delete];
+    } );
+
+    const changedTriples = [...allInserts, ...allDeletes];
 
     const someTripleMatchedSpec =
-        originFilteredTriples
+        changedTriples
         .some( (triple) => tripleMatchesSpec( triple, matchSpec ) );
 
     if( process.env["DEBUG_TRIPLE_MATCHES_SPEC"] )
@@ -74,10 +76,10 @@ async function informWatchers( changeSets, changedTriples, res, muCallIdTrail ){
 
       if( entry.options && entry.options.gracePeriod ) {
         setTimeout(
-          () => sendRequest( entry, changeSets, muCallIdTrail ),
+          () => sendRequest( entry, originFilteredChangeSets, muCallIdTrail ),
           entry.options.gracePeriod );
       } else {
-        sendRequest( entry, changeSets, muCallIdTrail );
+        sendRequest( entry, originFilteredChangeSets, muCallIdTrail );
       }
     }
   } );
@@ -179,12 +181,12 @@ async function sendRequest( entry, changeSets, muCallIdTrail ) {
   });
 }
 
-async function filterMatchesForOrigin( changedTriples, entry ) {
+async function filterMatchesForOrigin( changeSets, entry ) {
   if( ! entry.options || !entry.options.ignoreFromSelf ) {
-    return changedTriples;
+    return changeSets;
   } else {
     const originIpAddress = await getServiceIp( entry );
-    return changedTriples.filter( (change) => change.origin != originIpAddress );
+    return changeSets.filter( (changeSet) => changeSet.origin != originIpAddress );
   }
 }
 
