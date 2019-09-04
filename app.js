@@ -5,7 +5,12 @@ import bodyParser from 'body-parser';
 import dns from 'dns';
 
 // Also parse application/json as json
-app.use( bodyParser.json( { type: function(req) { return /^application\/json/.test( req.get('content-type') ); } } ) );
+app.use( bodyParser.json( {
+  type: function(req) {
+    return /^application\/json/.test( req.get('content-type') );
+  },
+  limit: '500mb'
+} ) );
 
 // Log server config if requested
 if( process.env["LOG_SERVER_CONFIGURATION"] )
