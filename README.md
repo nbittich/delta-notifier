@@ -74,9 +74,9 @@ The exported property contains an array of definitions, each linking a match to 
 
 The delta may be offered in multiple formats.  Versions should match the exact string.  Specify `options.resourceFormat` to indicate the specific resourceformat.
 
-### v0.0.0-genesis
+### v0.0.1
 
-Genesis format as described by the initial Delta service PoC.  This format may be extended with authorization rights etc.  The current format looks like:
+v0.0.1 is the latest format of the delta messages. It may be extended with authorization rights etc. in the future. The current format looks like:
 
 ```json
     [
@@ -85,6 +85,20 @@ Genesis format as described by the initial Delta service PoC.  This format may b
                      "object": { "type": "uri", "value": "https://schema.org/Project" }}],
         "deletes": [] }
     ]
+```
+
+### v0.0.0-genesis
+
+Genesis format as described by the initial Delta service PoC. It looks like:
+
+```json
+    { 
+      "delta": {
+        "inserts": [{"s": "http://mu.semte.ch/",
+                     "p": "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
+                     "o": "https://schema.org/Project"}],
+        "deletes": [] }
+    }
 ```
 
 ### false or undefined
