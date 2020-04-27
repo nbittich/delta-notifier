@@ -76,13 +76,16 @@ The delta may be offered in multiple formats.  Versions should match the exact s
 
 ### v0.0.1
 
-v0.0.1 is the latest format of the delta messages. It may be extended with authorization rights etc. in the future. The current format looks like:
+v0.0.1 is the latest format of the delta messages. It may be extended with authorization rights etc. in the future. It follows the [json-sparql spec](https://www.w3.org/TR/sparql11-results-json/).The current format looks like:
 
 ```json
     [
       { "inserts": [{"subject": { "type": "uri", "value": "http://mu.semte.ch/" },
                      "predicate": { "type": "uri", "value": "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" },
-                     "object": { "type": "uri", "value": "https://schema.org/Project" }}],
+                     "object": { "type": "uri", "value": "https://schema.org/Project" }},
+                     {"subject": { "type": "uri", "value": "http://mu.semte.ch/" },
+                     "predicate": { "type": "uri", "value": "http://purl.org/dc/terms/modified" },
+                     "object": { "type": "literal", "value": "https://schema.org/Project", "datatype": "http://www.w3.org/2001/XMLSchema#dateTime"}}],
         "deletes": [] }
     ]
 ```
