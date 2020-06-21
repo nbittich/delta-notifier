@@ -76,7 +76,7 @@ The delta may be offered in multiple formats.  Versions should match the exact s
 
 ### v0.0.1
 
-v0.0.1 is the latest format of the delta messages. It may be extended with authorization rights etc. in the future. It follows the [json-sparql spec](https://www.w3.org/TR/sparql11-results-json/).The current format looks like:
+v0.0.1 is the latest format of the delta messages. It may be extended with authorization rights etc. in the future. The value encoding follows the [json-sparql spec RDF term encoding](https://www.w3.org/TR/sparql11-results-json/#select-encode-terms).  For example:
 
 ```json
     [
