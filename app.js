@@ -22,6 +22,7 @@ app.get( '/', function( req, res ) {
 } );
 
 app.post( '/', function( req, res ) {
+  console.log("Post");
   if( process.env["LOG_REQUESTS"] ) {
     console.log("Logging request body");
     console.log(req.body);
@@ -32,6 +33,9 @@ app.post( '/', function( req, res ) {
   const originalMuCallIdTrail = JSON.parse( req.get('mu-call-id-trail') || "[]" );
   const originalMuCallId = req.get('mu-call-id');
   const muCallIdTrail = JSON.stringify( [...originalMuCallIdTrail, originalMuCallId] );
+  const muSessionId = req.get('mu-session-id');
+
+  // console.log(muSessionId);
 
   changeSets.forEach( (change) => {
     change.insert = change.insert || [];
@@ -39,13 +43,13 @@ app.post( '/', function( req, res ) {
   } );
 
   // inform watchers
-    informWatchers( changeSets, res, muCallIdTrail );
+    informWatchers( changeSets, res, muCallIdTrail, muSessionId );
 
   // push relevant data to interested actors
   res.status(204).send();
 } );
 
-async function informWatchers( changeSets, res, muCallIdTrail ){
+async function informWatchers( changeSets, res, muCallIdTrail, muSessionId ){
   services.map( async (entry) => {
     // for each entity
     if( process.env["DEBUG_DELTA_MATCH"] )
@@ -81,10 +85,10 @@ async function informWatchers( changeSets, res, muCallIdTrail ){
 
       if( entry.options && entry.options.gracePeriod ) {
         setTimeout(
-          () => sendRequest( entry, originFilteredChangeSets, muCallIdTrail ),
+          () => sendRequest( entry, originFilteredChangeSets, muCallIdTrail, muSessionId ),
           entry.options.gracePeriod );
       } else {
-        sendRequest( entry, originFilteredChangeSets, muCallIdTrail );
+        sendRequest( entry, originFilteredChangeSets, muCallIdTrail, muSessionId );
       }
     }
   } );
@@ -144,13 +148,13 @@ function formatChangesetBody( changeSets, options ) {
   }
 }
 
-async function sendRequest( entry, changeSets, muCallIdTrail ) {
+async function sendRequest( entry, changeSets, muCallIdTrail, muSessionId ) {
   let requestObject; // will contain request information
 
   // construct the requestObject
   const method = entry.callback.method;
   const url = entry.callback.url;
-  const headers = { "Content-Type": "application/json", "MU-AUTH-ALLOWED-GROUPS": changeSets[0].allowedGroups, "mu-call-id-trail": muCallIdTrail, "mu-call-id": uuid() };
+  const headers = { "Content-Type": "application/json", "MU-AUTH-ALLOWED-GROUPS": changeSets[0].allowedGroups, "mu-call-id-trail": muCallIdTrail, "mu-call-id": uuid() , "mu-session-id": muSessionId };
 
   if( entry.options && entry.options.resourceFormat ) {
     // we should send contents
