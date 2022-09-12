@@ -22,7 +22,6 @@ app.get( '/', function( req, res ) {
 } );
 
 app.post( '/', function( req, res ) {
-  console.log("Post");
   if( process.env["LOG_REQUESTS"] ) {
     console.log("Logging request body");
     console.log(req.body);
@@ -34,8 +33,6 @@ app.post( '/', function( req, res ) {
   const originalMuCallId = req.get('mu-call-id');
   const muCallIdTrail = JSON.stringify( [...originalMuCallIdTrail, originalMuCallId] );
   const muSessionId = req.get('mu-session-id');
-
-  // console.log(muSessionId);
 
   changeSets.forEach( (change) => {
     change.insert = change.insert || [];
