@@ -1,8 +1,11 @@
 import { app, uuid } from 'mu';
-import request from 'request';
+import fetch from 'node-fetch';
 import services from '/config/rules.js';
 import bodyParser from 'body-parser';
 import dns from 'dns';
+
+const IP_LOOKUP_CACHE = new Map();
+const IP_LOOKUP_CACHE_RETRY_TIMEOUT = 15000;
 
 // Also parse application/json as json
 app.use( bodyParser.json( {
@@ -152,47 +155,52 @@ async function sendRequest( entry, changeSets, muCallIdTrail, muSessionId ) {
   const method = entry.callback.method;
   const url = entry.callback.url;
   const headers = { "Content-Type": "application/json", "MU-AUTH-ALLOWED-GROUPS": changeSets[0].allowedGroups, "mu-call-id-trail": muCallIdTrail, "mu-call-id": uuid() , "mu-session-id": muSessionId };
-
-  if( entry.options && entry.options.resourceFormat ) {
-    // we should send contents
-    const body = formatChangesetBody( changeSets, entry.options );
-
-    // TODO: we now assume the mu-auth-allowed-groups will be the same
-    // for each changeSet.  that's a simplification and we should not
-    // depend on it.
-
-    requestObject = {
-      url, method,
-      headers,
-      body: body
-    };
-  } else {
-    // we should only inform
-    requestObject = { url, method, headers };
-  }
+  // TODO: we now assume the mu-auth-allowed-groups will be the same
+  // for each changeSet.  that's a simplification and we should not
+  // depend on it.
+  const body = entry.options && entry.options.resourceFormat ? formatChangesetBody( changeSets, entry.options ): null;
+ 
 
   if( process.env["DEBUG_DELTA_SEND"] )
     console.log(`Executing send ${method} to ${url}`);
 
-  request( requestObject, function( error, response, body ) {
-    if( error ) {
+    try {
+      const response = await fetch(url, {
+        headers,
+        method,
+        body,
+      });
+      if(await response) {
+        // const respText = await response.text();
+        //console.log(respText);
+      } 
+    } catch(e) {
       console.log(`Could not send request ${method} ${url}`);
       console.log(error);
       console.log(`NOT RETRYING`); // TODO: retry a few times when delta's fail to send
     }
-
-    if( response ) {
-      // console.log( body );
-    }
-  });
+ 
 }
 
 async function filterMatchesForOrigin( changeSets, entry ) {
   if( ! entry.options || !entry.options.ignoreFromSelf ) {
     return changeSets;
   } else {
-    const originIpAddress = await getServiceIp( entry );
-    return changeSets.filter( (changeSet) => changeSet.origin != originIpAddress );
+    try {
+      const originIpAddress = await getServiceIp( entry );
+      if(originIpAddress) {
+        return changeSets.filter( (changeSet) => changeSet.origin != originIpAddress );
+      } else{
+         // we couldn't figure what's the ip address, thus we filter everything. not great, but this is just
+         // for experimenting 
+        return [];
+      }
+    } catch(e) {
+      // handle the case when a service is down and the dns lookup cannot be performed.
+      console.log(`something went wrong for changeSets ${changeSets} and entry ${entry} during lookup ${e}`);
+      return []; // service is down anyway, don't send.
+      
+    }
   }
 }
 
@@ -200,13 +208,25 @@ function hostnameForEntry( entry ) {
   return (new URL(entry.callback.url)).hostname;
 }
 
-async function getServiceIp(entry) {
+async function getServiceIp(entry, retry=false) {
+
   const hostName = hostnameForEntry( entry );
+  if(!retry && IP_LOOKUP_CACHE.has(hostName)) {
+    return IP_LOOKUP_CACHE.get(hostName);
+  }
   return new Promise( (resolve, reject) => {
     dns.lookup( hostName, { family: 4 }, ( err, address) => {
-      if( err )
+      if( err ) {
+        IP_LOOKUP_CACHE.set(hostName, false);
+        setTimeout(async ()=> {
+          try {
+            await getServiceIp(entry, true);
+          }catch (e) {
+          }
+        }, IP_LOOKUP_CACHE_RETRY_TIMEOUT); // retry to put it in cache after x seconds
         reject( err );
-      else
+      } else
+        IP_LOOKUP_CACHE.set(hostName, address);
         resolve( address );
     } );
   } );
